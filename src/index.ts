@@ -17,8 +17,18 @@ import {
     openMobileFileById,
     lockScreen,
     ICard,
-    ICardData
+    ICardData,
+    Custom,
+    exitSiYuan,
+    getModelByDockType,
+    getAllEditor,
+    Files,
+    platformUtils,
+    openSetting,
+    openAttributePanel,
+    saveLayout
 } from "siyuan";
+import {IMenuItem} from "siyuan/types";
 
 const STORAGE_NAME = "menu-config";
 const TAB_TYPE = "custom_tab";
@@ -26,8 +36,24 @@ const DOCK_TYPE = "dock_tab";
 
 export default class PluginSample extends Plugin {
 
+    private custom: () => Custom;
     private isMobile: boolean;
     private blockIconEventBindThis = this.blockIconEvent.bind(this);
+
+    updateProtyleToolbar(toolbar: Array<string | IMenuItem>) {
+        toolbar.push("|");
+        toolbar.push({
+            name: "insert-smail-emoji",
+            icon: "iconEmoji",
+            hotkey: "⇧⌘I",
+            tipPosition: "n",
+            tip: this.i18n.insertEmoji,
+            click(protyle: Protyle) {
+                protyle.insert("😊");
+            }
+        });
+        return toolbar;
+    }
 
     onload() {
         this.data[STORAGE_NAME] = {readonlyText: "Readonly"};
@@ -82,7 +108,7 @@ export default class PluginSample extends Plugin {
             element: statusIconTemp.content.firstElementChild as HTMLElement,
         });
 
-        this.addTab({
+        this.custom = this.addTab({
             type: TAB_TYPE,
             init() {
                 this.element.innerHTML = `<div class="plugin-sample__custom-tab">${this.data.text}</div>`;
@@ -142,8 +168,7 @@ export default class PluginSample extends Plugin {
                     dock.element.innerHTML = `<div class="fn__flex-1 fn__flex-column">
     <div class="block__icons">
         <div class="block__logo">
-            <svg><use xlink:href="#iconEmoji"></use></svg>
-            Custom Dock
+            <svg class="block__logoicon"><use xlink:href="#iconEmoji"></use></svg>Custom Dock
         </div>
         <span class="fn__flex-1 fn__space"></span>
         <span data-type="min" class="block__icon b3-tooltips b3-tooltips__sw" aria-label="Min ${adaptHotkey("⌘W")}"><svg><use xlink:href="#iconMin"></use></svg></span>
@@ -167,6 +192,8 @@ export default class PluginSample extends Plugin {
         });
         this.setting.addItem({
             title: "Readonly text",
+            direction: "row",
+            description: "Open plugin url in browser",
             createActionElement: () => {
                 textareaElement.className = "b3-text-field fn__block";
                 textareaElement.placeholder = "Readonly text in the menu";
@@ -190,7 +217,7 @@ export default class PluginSample extends Plugin {
             filter: ["insert emoji 😊", "插入表情 😊", "crbqwx"],
             html: `<div class="b3-list-item__first"><span class="b3-list-item__text">${this.i18n.insertEmoji}</span><span class="b3-list-item__meta">😊</span></div>`,
             id: "insertEmoji",
-            callback(protyle: Protyle) {
+            callback(protyle: Protyle, nodeElement: HTMLElement) {
                 protyle.insert("😊");
             }
         }];
@@ -214,17 +241,7 @@ export default class PluginSample extends Plugin {
                 "tag",
                 "inline-math",
                 "inline-memo",
-                "|",
-                {
-                    name: "insert-smail-emoji",
-                    icon: "iconEmoji",
-                    hotkey: "⇧⌘I",
-                    tipPosition: "n",
-                    tip: this.i18n.insertEmoji,
-                    click(protyle: Protyle) {
-                        protyle.insert("😊");
-                    }
-                }],
+            ],
         };
 
         console.log(this.i18n.helloPlugin);
@@ -299,6 +316,7 @@ export default class PluginSample extends Plugin {
 
     private blockIconEvent({detail}: any) {
         detail.menu.addItem({
+            id: "pluginSample_removeSpace",
             iconHTML: "",
             label: this.i18n.removeSpace,
             click: () => {
@@ -341,7 +359,7 @@ export default class PluginSample extends Plugin {
             height: "540px",
         });
         new Protyle(this.app, dialog.element.querySelector("#protyle"), {
-            blockId: "20200812220555-lj3enxa",
+            blockId: this.getEditor().protyle.block.rootID,
         });
         fetchPost("/api/system/currentTime", {}, (response) => {
             dialog.element.querySelector("#time").innerHTML = new Date(response.data).toString();
@@ -353,11 +371,36 @@ export default class PluginSample extends Plugin {
             console.log(this.i18n.byeMenu);
         });
         menu.addItem({
+            icon: "iconSettings",
+            label: "Open Setting",
+            click: () => {
+                openSetting(this.app);
+            }
+        });
+        menu.addItem({
+            icon: "iconDrag",
+            label: "Open Attribute Panel",
+            click: () => {
+                openAttributePanel({
+                    nodeElement: this.getEditor().protyle.wysiwyg.element.firstElementChild as HTMLElement,
+                    protyle: this.getEditor().protyle,
+                    focusName: "custom",
+                });
+            }
+        });
+        menu.addItem({
             icon: "iconInfo",
-            label: "Dialog(open help first)",
+            label: "Dialog(open doc first)",
             accelerator: this.commands[0].customHotkey,
             click: () => {
                 this.showDialog();
+            }
+        });
+        menu.addItem({
+            icon: "iconFocus",
+            label: "Select Opened Doc(open doc first)",
+            click: () => {
+                (getModelByDockType("file") as Files).selectItem(this.getEditor().protyle.notebookId, this.getEditor().protyle.path);
             }
         });
         if (!this.isMobile) {
@@ -371,7 +414,7 @@ export default class PluginSample extends Plugin {
                             icon: "iconFace",
                             title: "Custom Tab",
                             data: {
-                                text: "This is my custom tab",
+                                text: platformUtils.isHuawei() ? "Hello, Huawei!" : "This is my custom tab",
                             },
                             id: this.name + TAB_TYPE
                         },
@@ -381,7 +424,7 @@ export default class PluginSample extends Plugin {
             });
             menu.addItem({
                 icon: "iconImage",
-                label: "Open Asset Tab(open help first)",
+                label: "Open Asset Tab(First open the Chinese help document)",
                 click: () => {
                     const tab = openTab({
                         app: this.app,
@@ -394,12 +437,12 @@ export default class PluginSample extends Plugin {
             });
             menu.addItem({
                 icon: "iconFile",
-                label: "Open Doc Tab(open help first)",
+                label: "Open Doc Tab(open doc first)",
                 click: async () => {
                     const tab = await openTab({
                         app: this.app,
                         doc: {
-                            id: "20200812220555-lj3enxa",
+                            id: this.getEditor().protyle.block.rootID,
                         }
                     });
                     console.log(tab);
@@ -433,31 +476,31 @@ export default class PluginSample extends Plugin {
             });
             menu.addItem({
                 icon: "iconLayout",
-                label: "Open Float Layer(open help first)",
+                label: "Open Float Layer(open doc first)",
                 click: () => {
                     this.addFloatLayer({
-                        ids: ["20210428212840-8rqwn5o", "20201225220955-l154bn4"],
-                        defIds: ["20230415111858-vgohvf3", "20200813131152-0wk5akh"],
+                        refDefs: [{refID: this.getEditor().protyle.block.rootID}],
                         x: window.innerWidth - 768 - 120,
-                        y: 32
+                        y: 32,
+                        isBacklink: false
                     });
                 }
             });
             menu.addItem({
                 icon: "iconOpenWindow",
-                label: "Open Doc Window(open help first)",
+                label: "Open Doc Window(open doc first)",
                 click: () => {
                     openWindow({
-                        doc: {id: "20200812220555-lj3enxa"}
+                        doc: {id: this.getEditor().protyle.block.rootID}
                     });
                 }
             });
         } else {
             menu.addItem({
                 icon: "iconFile",
-                label: "Open Doc(open help first)",
+                label: "Open Doc(open doc first)",
                 click: () => {
-                    openMobileFileById(this.app, "20200812220555-lj3enxa");
+                    openMobileFileById(this.app, this.getEditor().protyle.block.rootID);
                 }
             });
         }
@@ -466,6 +509,22 @@ export default class PluginSample extends Plugin {
             label: "Lockscreen",
             click: () => {
                 lockScreen(this.app);
+            }
+        });
+        menu.addItem({
+            icon: "iconQuit",
+            label: "Exit Application",
+            click: () => {
+                exitSiYuan();
+            }
+        });
+        menu.addItem({
+            icon: "iconDownload",
+            label: "Save Layout",
+            click: () => {
+                saveLayout(() => {
+                    showMessage("Layout saved");
+                });
             }
         });
         menu.addItem({
@@ -531,6 +590,18 @@ export default class PluginSample extends Plugin {
                 label: "Off click-editortitleicon",
                 click: () => {
                     this.eventBus.off("click-editortitleicon", this.eventBusLog);
+                }
+            }, {
+                icon: "iconSelect",
+                label: "On click-flashcard-action",
+                click: () => {
+                    this.eventBus.on("click-flashcard-action", this.eventBusLog);
+                }
+            }, {
+                icon: "iconClose",
+                label: "Off click-flashcard-action",
+                click: () => {
+                    this.eventBus.off("click-flashcard-action", this.eventBusLog);
                 }
             }, {
                 icon: "iconSelect",
@@ -760,6 +831,30 @@ export default class PluginSample extends Plugin {
                 click: () => {
                     this.eventBus.off("open-siyuan-url-block", this.eventBusLog);
                 }
+            }, {
+                icon: "iconSelect",
+                label: "On opened-notebook",
+                click: () => {
+                    this.eventBus.on("opened-notebook", this.eventBusLog);
+                }
+            }, {
+                icon: "iconClose",
+                label: "Off opened-notebook",
+                click: () => {
+                    this.eventBus.off("opened-notebook", this.eventBusLog);
+                }
+            }, {
+                icon: "iconSelect",
+                label: "On closed-notebook",
+                click: () => {
+                    this.eventBus.on("closed-notebook", this.eventBusLog);
+                }
+            }, {
+                icon: "iconClose",
+                label: "Off closed-notebook",
+                click: () => {
+                    this.eventBus.off("closed-notebook", this.eventBusLog);
+                }
             }]
         });
         menu.addSeparator();
@@ -777,5 +872,14 @@ export default class PluginSample extends Plugin {
                 isLeft: true,
             });
         }
+    }
+
+    private getEditor() {
+        const editors = getAllEditor();
+        if (editors.length === 0) {
+            showMessage("please open doc first");
+            return;
+        }
+        return editors[0];
     }
 }
