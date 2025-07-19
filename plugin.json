@@ -1,18 +1,18 @@
 {
-  "name": "siyuan-plugin-weread",
+  "name": "siyuan-plugin-sample-vue",
   "author": "mdzz2048",
   "url": "https://github.com/mdzz2048/siyuan-plugin-weread",
-  "version": "1.2.4",
-  "minAppVersion": "2.9.8",
+  "version": "0.0.1",
+  "minAppVersion": "3.2.0",
   "backends": ["windows", "linux", "darwin", "android", "docker"],
   "frontends": ["desktop", "browser-mobile", "browser-desktop"],
   "displayName": {
-    "en_US": "siyuan-weread-plugin",
-    "zh_CN": "微信读书插件"
+    "en_US": "siyuan-plugin-sample-vue",
+    "zh_CN": "思源笔记插件"
   },
   "description": {
-    "en_US": "Sync weread notes",
-    "zh_CN": "同步微信读书笔记"
+    "en_US": "One ordinary Siyuan plugin",
+    "zh_CN": "一个普通的思源笔记插件"
   },
   "readme": {
     "en_US": "README_en_US.md",
